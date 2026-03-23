@@ -4,8 +4,8 @@ const app = express();
 app.use(express.json());
 
 // 🔥 REPLACE THESE TWO
-const CLIENT_ID = 2308ea9ee4a0e2ebb27c5e67435b7805;
-const CLIENT_SECRET = 2308ea9ee4a0e2ebb27c5e67435b7805;
+const CLIENT_ID = "2308ea9ee4a0e2ebb27c5e67435b7805";
+const CLIENT_SECRET = "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";
 
 const SHOP = "tailwaggers-pet-food-supplies";
 
