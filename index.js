@@ -1,48 +1,34 @@
-const express = require('express');
-const app = express();
-
-app.use(express.json());
-
-let coupons = [];
-
-// test
-app.get('/', (req, res) => {
-  res.send('API is running');
-});
-
-// Shopify webhook
 app.post('/webhook/discount', (req, res) => {
   console.log('🔥 WEBHOOK HIT');
 
   try {
     const body = req.body;
 
-    // Shopify sends different formats depending on webhook
+    console.log('FULL BODY:', JSON.stringify(body, null, 2));
+
     let code = null;
     let value = null;
 
-    // Try common Shopify structures
-    if (body.code) {
-      code = body.code;
-    } else if (body.discount_code?.code) {
-      code = body.discount_code.code;
-    }
+    // Try ALL possible locations
+    code =
+      body.code ||
+      body.title ||
+      body.discount_code?.code ||
+      body.discount_codes?.[0]?.code ||
+      body.codes?.[0];
 
-    if (body.value) {
-      value = body.value;
-    } else if (body.discount_code?.amount) {
-      value = body.discount_code.amount;
-    }
+    value =
+      body.value ||
+      body.amount ||
+      body.discount_code?.amount ||
+      body.value_type === "percentage" ? body.value : null;
 
     if (!code) {
-      console.log('No code found in webhook');
+      console.log('❌ Still no code found');
       return res.sendStatus(200);
     }
 
-    coupons.push({
-      code,
-      value
-    });
+    coupons.push({ code, value });
 
     console.log('✅ Saved coupon:', code, value);
 
@@ -52,21 +38,3 @@ app.post('/webhook/discount', (req, res) => {
 
   res.sendStatus(200);
 });
-
-// check coupon
-app.get('/validate', (req, res) => {
-  const code = req.query.code;
-
-  const found = coupons.find(c => c.code === code);
-
-  if (!found) {
-    return res.json({ valid: false });
-  }
-
-  res.json({
-    valid: true,
-    value: found.value
-  });
-});
-
-app.listen(3000, () => console.log('Server running'));
