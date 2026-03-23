@@ -1,5 +1,5 @@
 const express = require('express');
-const app = express(); // ← THIS is what was missing
+const app = express();
 
 app.use(express.json());
 
@@ -10,15 +10,34 @@ app.get('/', (req, res) => {
   res.send('API is running');
 });
 
-// webhook
+// webhook (handles ALL Shopify formats)
 app.post('/webhook/discount', (req, res) => {
   console.log('🔥 WEBHOOK HIT');
 
   try {
     const body = req.body || {};
 
-    let code = body.code || body.title || null;
-    let value = body.value || body.amount || null;
+    console.log('FULL BODY:', JSON.stringify(body, null, 2));
+
+    let code = null;
+    let value = null;
+
+    // Try EVERY possible place Shopify might put the code
+    if (body.code) code = body.code;
+    if (body.title) code = body.title;
+    if (body.discount_code && body.discount_code.code) {
+      code = body.discount_code.code;
+    }
+    if (body.discount_codes && body.discount_codes.length > 0) {
+      code = body.discount_codes[0].code;
+    }
+
+    // Try to get value
+    if (body.value) value = body.value;
+    if (body.amount) value = body.amount;
+    if (body.discount_code && body.discount_code.amount) {
+      value = body.discount_code.amount;
+    }
 
     if (!code) {
       console.log('❌ No code found');
@@ -27,7 +46,7 @@ app.post('/webhook/discount', (req, res) => {
 
     coupons.push({ code, value });
 
-    console.log('✅ Saved coupon:', code, value);
+    console.log('✅ SAVED:', code, value);
 
   } catch (err) {
     console.error('ERROR:', err.message);
@@ -36,7 +55,7 @@ app.post('/webhook/discount', (req, res) => {
   res.sendStatus(200);
 });
 
-// validate
+// validate route
 app.get('/validate', (req, res) => {
   const code = req.query.code;
 
@@ -52,8 +71,35 @@ app.get('/validate', (req, res) => {
   });
 });
 
-// server start
+// POS screen
 app.get('/pos', (req, res) => {
-  res.sendFile(__dirname + '/public.html');
+  res.send(`
+    <html>
+      <body style="font-family:Arial;text-align:center;margin-top:50px;">
+        <h1>Enter Coupon</h1>
+        <input id="code" style="font-size:20px;padding:10px;" />
+        <br><br>
+        <button onclick="check()" style="font-size:20px;padding:10px;">Apply</button>
+        <h2 id="result"></h2>
+
+        <script>
+          async function check() {
+            const code = document.getElementById('code').value;
+            const res = await fetch('/validate?code=' + code);
+            const data = await res.json();
+
+            if (data.valid) {
+              document.getElementById('result').innerText =
+                'Apply ' + data.value + '% discount';
+            } else {
+              document.getElementById('result').innerText =
+                'Invalid code';
+            }
+          }
+        </script>
+      </body>
+    </html>
+  `);
 });
+
 app.listen(3000, () => console.log('Server running'));
