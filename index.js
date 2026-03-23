@@ -53,4 +53,7 @@ app.get('/validate', (req, res) => {
 });
 
 // server start
+app.get('/pos', (req, res) => {
+  res.sendFile(__dirname + '/public.html');
+});
 app.listen(3000, () => console.log('Server running'));
