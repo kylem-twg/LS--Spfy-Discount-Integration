@@ -1,30 +1,27 @@
+const express = require('express');
+const app = express(); // ← THIS is what was missing
+
+app.use(express.json());
+
+let coupons = [];
+
+// homepage
+app.get('/', (req, res) => {
+  res.send('API is running');
+});
+
+// webhook
 app.post('/webhook/discount', (req, res) => {
   console.log('🔥 WEBHOOK HIT');
 
   try {
-    const body = req.body;
+    const body = req.body || {};
 
-    console.log('FULL BODY:', JSON.stringify(body, null, 2));
-
-    let code = null;
-    let value = null;
-
-    // Try ALL possible locations
-    code =
-      body.code ||
-      body.title ||
-      body.discount_code?.code ||
-      body.discount_codes?.[0]?.code ||
-      body.codes?.[0];
-
-    value =
-      body.value ||
-      body.amount ||
-      body.discount_code?.amount ||
-      body.value_type === "percentage" ? body.value : null;
+    let code = body.code || body.title || null;
+    let value = body.value || body.amount || null;
 
     if (!code) {
-      console.log('❌ Still no code found');
+      console.log('❌ No code found');
       return res.sendStatus(200);
     }
 
@@ -33,8 +30,27 @@ app.post('/webhook/discount', (req, res) => {
     console.log('✅ Saved coupon:', code, value);
 
   } catch (err) {
-    console.error(err);
+    console.error('ERROR:', err.message);
   }
 
   res.sendStatus(200);
 });
+
+// validate
+app.get('/validate', (req, res) => {
+  const code = req.query.code;
+
+  const found = coupons.find(c => c.code === code);
+
+  if (!found) {
+    return res.json({ valid: false });
+  }
+
+  res.json({
+    valid: true,
+    value: found.value
+  });
+});
+
+// server start
+app.listen(3000, () => console.log('Server running'));
