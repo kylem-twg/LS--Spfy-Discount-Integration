@@ -10,7 +10,7 @@ app.get('/', (req, res) => {
   res.send('API is running');
 });
 
-// webhook (handles ALL Shopify formats)
+// webhook
 app.post('/webhook/discount', (req, res) => {
   console.log('🔥 WEBHOOK HIT');
 
@@ -22,7 +22,7 @@ app.post('/webhook/discount', (req, res) => {
     let code = null;
     let value = null;
 
-    // Try EVERY possible place Shopify might put the code
+    // get code
     if (body.code) code = body.code;
     if (body.title) code = body.title;
     if (body.discount_code && body.discount_code.code) {
@@ -32,12 +32,15 @@ app.post('/webhook/discount', (req, res) => {
       code = body.discount_codes[0].code;
     }
 
-    // Try to get value
+    // try value
     if (body.value) value = body.value;
     if (body.amount) value = body.amount;
-    if (body.discount_code && body.discount_code.amount) {
-      value = body.discount_code.amount;
+    if (body.value_type === "percentage") {
+      value = body.value || 10;
     }
+
+    // 👉 fallback if still null
+    if (!value) value = 10;
 
     if (!code) {
       console.log('❌ No code found');
@@ -55,7 +58,7 @@ app.post('/webhook/discount', (req, res) => {
   res.sendStatus(200);
 });
 
-// validate route
+// validate
 app.get('/validate', (req, res) => {
   const code = req.query.code;
 
