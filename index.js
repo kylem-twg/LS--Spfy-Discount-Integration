@@ -3,7 +3,11 @@ const app = express();
 
 app.use(express.json());
 
-let coupons = [];
+let coupons = {};
+
+// 🔥 PUT YOUR INFO HERE
+const SHOP = "tailwaggers-pet-food-supplies";
+const ACCESS_TOKEN = "PASTE_YOUR_TOKEN_HERE";
 
 // homepage
 app.get('/', (req, res) => {
@@ -11,28 +15,78 @@ app.get('/', (req, res) => {
 });
 
 // webhook
-app.post('/webhook/discount', (req, res) => {
+app.post('/webhook/discount', async (req, res) => {
   console.log('🔥 WEBHOOK HIT');
 
   try {
-    const body = req.body || {};
+    const body = req.body;
 
-    console.log('FULL BODY:', JSON.stringify(body, null, 2));
+    const code = body.title;
+    const gqlId = body.admin_graphql_api_id;
 
-    // Shopify sends code as "title"
-    const code = body.title || body.code || null;
-
-    if (!code) {
-      console.log('❌ No code found');
+    if (!code || !gqlId) {
       return res.sendStatus(200);
     }
 
-    // 🔥 TEMP VALUE (we fix later if you want)
-    const value = 10;
+    // 🔥 GRAPHQL REQUEST
+    const response = await fetch(
+      `https://${SHOP}.myshopify.com/admin/api/2024-01/graphql.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": ACCESS_TOKEN
+        },
+        body: JSON.stringify({
+          query: `
+          query {
+            node(id: "${gqlId}") {
+              ... on DiscountCodeNode {
+                discount {
+                  ... on DiscountCodeBasic {
+                    customerGets {
+                      value {
+                        ... on DiscountAmount {
+                          amount
+                        }
+                        ... on DiscountPercentage {
+                          percentage
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          `
+        })
+      }
+    );
 
-    coupons.push({ code, value });
+    const data = await response.json();
 
-    console.log('✅ SAVED:', code, value);
+    let value = null;
+
+    const discount =
+      data?.data?.node?.discount?.customerGets?.value;
+
+    if (discount?.amount) {
+      value = Number(discount.amount);
+    }
+
+    if (discount?.percentage) {
+      value = Number(discount.percentage);
+    }
+
+    if (!value) {
+      console.log('❌ Could not extract value');
+      return res.sendStatus(200);
+    }
+
+    coupons[code] = value;
+
+    console.log('✅ SAVED REAL:', code, value);
 
   } catch (err) {
     console.error(err);
@@ -45,15 +99,15 @@ app.post('/webhook/discount', (req, res) => {
 app.get('/validate', (req, res) => {
   const code = req.query.code;
 
-  const found = coupons.find(c => c.code === code);
+  const value = coupons[code];
 
-  if (!found) {
+  if (!value) {
     return res.json({ valid: false });
   }
 
   res.json({
     valid: true,
-    value: found.value
+    value: value
   });
 });
 
